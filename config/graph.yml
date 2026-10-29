@@ -1,0 +1,13 @@
+experiment:
+  name: DiGi
+paths:
+  base_dir: /path/to/project
+
+graph:
+  # one FASTA per haplotype (<hap>.fa)
+  haplotype_fasta_dir: "{base_dir}/panel"
+
+  # liftover output folder: <hap>/<hap>_hotspots_lifted_final.bed (after the lift-fail filter)
+  rh_bed_file: "{base_dir}/liftover_results"
+
+  graph_file: "{base_dir}/ref_graph/ref_graph.txt"

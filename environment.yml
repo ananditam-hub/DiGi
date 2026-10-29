@@ -1,0 +1,15 @@
+# Everything DiGi needs except Gurobi (install separately and set GUROBI_HOME).
+#   conda env create -f environment.yml && conda activate digi
+name: digi
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python>=3.9
+  - pyyaml
+  - gxx_linux-64      # C++ compiler; sets CXX for make
+  - make
+  - fastp             # read quality filtering
+  - nextflow          # runs nf-LO for liftover
+  - minimap2          # aligner used by nf-LO
+  - crossmap          # lifts junction BEDs through the chain files

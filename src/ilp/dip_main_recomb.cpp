@@ -623,6 +623,7 @@ int main(int argc, char *argv[]){
 
     } catch(GRBException& e){
         std::cerr << "Gurobi Error: " << e.getMessage() << std::endl;
+        return 1;
     }
 
     auto end = std::chrono::high_resolution_clock::now();
