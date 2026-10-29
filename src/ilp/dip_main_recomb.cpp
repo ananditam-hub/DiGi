@@ -135,7 +135,7 @@ void processGraphKmers(const std::string& graph_file,
     }
 }
 
-// ===================== NEW: HAPLOTYPE NODE-COORDINATE LOADER =====================
+// ===================== HAPLOTYPE NODE-COORDINATE LOADER =====================
 // Parses a debug-log-style file where each "row" of the lattice (one candidate
 // reference haplotype) is introduced by a "Processing ... (FASTA header: NAME)"
 // line, followed by exactly r+1 "Node k: start=S, end=E, length=L" lines giving
@@ -216,17 +216,16 @@ int main(int argc, char *argv[]){
     // Recombinations carry no objective cost; they are only limited by the --R budget.
     double c1 = 1.0, c2 = 1.0;
     int H = -1, r = -1;
-    int R = -1; // === NEW: max recombinations per haplotype path (-1 = unbounded) ===
+    int R = -1;
     std::string LABEL_INPUT_FILE = "ref_graph.txt";
     std::string sample_name      = "Sample";
-    std::string NODE_COORDS_FILE = ""; // === NEW: optional, enables the haplotype-region output ===
+    std::string NODE_COORDS_FILE = "";
 
-    // === NEW: parameter-sweep output naming + WLS checkout mutex ===
     std::string out_dir      = ".";
     std::string cov_label    = "";
     std::string rel_weights  = "";
     std::string lockfile_path = "/home/anandita/DipHPI/final_repository/.locks/gurobi_wls.lock";
-    int threads = -1; // === NEW: Gurobi Threads parameter (-1 = leave to gurobi.env) ===
+    int threads = -1; // === Gurobi Threads parameter (-1 = leave to gurobi.env) ===
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -281,8 +280,6 @@ int main(int argc, char *argv[]){
     }
 
     g.loadLabels(LABEL_INPUT_FILE);
-
-    // === NEW: load per-row haplotype names + coordinates, if provided ===
     std::vector<HaplotypeCoords> node_coords;
     if (!NODE_COORDS_FILE.empty()) {
         node_coords = loadNodeCoords(NODE_COORDS_FILE);
@@ -306,9 +303,6 @@ int main(int argc, char *argv[]){
 
     // --- GUROBI MODEL ---
     try {
-        // === NEW: serialize only the WLS license checkout across concurrently
-        // running jobs (via a shared-filesystem flock), so the network handshake
-        // never races between processes; solving proceeds in parallel afterwards.
         std::filesystem::create_directories(
             std::filesystem::path(lockfile_path).parent_path());
         int lockfd = open(lockfile_path.c_str(), O_CREAT | O_RDWR, 0666);
@@ -336,16 +330,12 @@ int main(int argc, char *argv[]){
 
         GRBModel model(env);
         model.set(GRB_StringAttr_ModelName, "Diploid Path Inference");
-        // === NEW: model-level Threads overrides the Threads 1 in src/gurobi.env ===
         if (threads >= 0) model.set(GRB_IntParam_Threads, threads);
 
         std::vector<GRBVar> x_1_vars, x_2_vars;
         std::vector<std::pair<int,int>> edge_list;
         std::vector<std::vector<int>> out_edge_idx1(g.n), in_edge_idx1(g.n);
         std::vector<std::vector<int>> out_edge_idx2(g.n), in_edge_idx2(g.n);
-        // === NEW: recombination edge weights W(u,v), aligned with edge_list ===
-        // A recombination is the 2-edge detour row -> hub -> row, so each hub edge
-        // (in either direction) weighs 1/2 and one recombination event weighs 1.
         auto is_hub = [&](int node) { return node > H*(r+1) && node != sink; };
         auto recomb_weight = [&](int u, int v) { return (is_hub(u) || is_hub(v)) ? 0.5 : 0.0; };
         std::vector<double> edge_w;
@@ -356,7 +346,6 @@ int main(int argc, char *argv[]){
             for(int v : g.adj[u]){
                 GRBVar var1 = model.addVar(0, 1, 0, GRB_BINARY, "x1_" + std::to_string(u) + "_" + std::to_string(v));
                 GRBVar var2 = model.addVar(0, 1, 0, GRB_BINARY, "x2_" + std::to_string(u) + "_" + std::to_string(v));
-// *
                 x_1_vars.push_back(var1); out_edge_idx1[u].push_back(x_1_vars.size()-1); in_edge_idx1[v].push_back(x_1_vars.size()-1);
                 x_2_vars.push_back(var2); out_edge_idx2[u].push_back(x_2_vars.size()-1); in_edge_idx2[v].push_back(x_2_vars.size()-1);
                 edge_list.emplace_back(u,v);
@@ -403,7 +392,6 @@ int main(int argc, char *argv[]){
             else { model.addConstr(out1 - in1 == 0); model.addConstr(out2 - in2 == 0); }
         }
 
-        // === NEW: recombination budget -- sum over (u,v) in E of W(u,v) * x_uv(i) <= R, per haplotype i ===
         if (R >= 0) {
             GRBLinExpr nrec1 = 0, nrec2 = 0;
             for (size_t idx = 0; idx < edge_list.size(); ++idx) {
@@ -505,11 +493,6 @@ int main(int argc, char *argv[]){
                         std::cout << "\nPath verification: Reached Sink (" << t << ")";
                         std::cout << "\nNumber of recombinations: " << n_recomb << "\n";
 
-                        // === CHANGED: write a FASTA file instead of a node_id/label table ===
-                        // Concatenate node labels in path order. Nodes with an empty label
-                        // (source, sink, and the recombination "hub" nodes created in the
-                        // r-loop above, none of which were assigned a label by loadLabels)
-                        // contribute nothing to the string, so this naturally skips them.
                         std::string sequence;
                         for (int node_id : path_nodes) {
                             sequence += g.label[node_id];
@@ -530,9 +513,6 @@ int main(int argc, char *argv[]){
                         } else {
                             std::cerr << "Error writing to file: " << out_filename << "\n";
                         }
-                        // === END CHANGED ===
-
-                        // === NEW: write which haplotype each region of the path was copied from ===
                         if (!node_coords.empty()) {
                             std::string region_filename = out_filename;
                             size_t dot = region_filename.find_last_of('.');
@@ -594,7 +574,6 @@ int main(int argc, char *argv[]){
                     }
                 };
 
-                // === CHANGED: sweep-friendly naming -- {out_dir}/{sample}_{hap}_{rel_weights}_{cov}.fa ===
                 std::filesystem::create_directories(out_dir);
                 std::string sol_tag = (nsol > 1 && s > 0) ? "_sol" + std::to_string(s) : "";
                 std::string file_path_1 = out_dir + "/" + sample_name + sol_tag + "_1_" + rel_weights + "_" + cov_label + ".fa";
