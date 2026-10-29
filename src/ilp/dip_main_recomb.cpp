@@ -235,8 +235,7 @@ int main(int argc, char *argv[]){
     std::string out_dir      = ".";
     std::string cov_label    = "";
     std::string rel_weights  = "";
-    std::string lockfile_path = "/home/anandita/DipHPI/final_repository/.locks/gurobi_wls.lock";
-    int threads = -1; // === Gurobi Threads parameter (-1 = leave to gurobi.env) ===
+    std::string lockfile_path = ""; // optional; serializes WLS checkout across concurrent jobs
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -262,7 +261,6 @@ int main(int argc, char *argv[]){
         else if (arg == "--cov" && i + 1 < argc)     cov_label = argv[++i];        // === NEW ===
         else if (arg == "--rel_weights" && i + 1 < argc) rel_weights = argv[++i];  // === NEW ===
         else if (arg == "--lockfile" && i + 1 < argc) lockfile_path = argv[++i];   // === NEW ===
-        else if (arg == "--threads" && i + 1 < argc)  threads = std::stoi(argv[++i]); // === NEW ===
     }
 
     if (GRAPH_KMERS_FILE.empty() || SK_FILE.empty() || H < 0 || r < 0) {
@@ -314,34 +312,39 @@ int main(int argc, char *argv[]){
 
     // --- GUROBI MODEL ---
     try {
-        std::filesystem::create_directories(
-            std::filesystem::path(lockfile_path).parent_path());
-        int lockfd = open(lockfile_path.c_str(), O_CREAT | O_RDWR, 0666);
+        int lockfd = -1;
+        if (!lockfile_path.empty()) {
+            std::filesystem::path lock_dir = std::filesystem::path(lockfile_path).parent_path();
+            if (!lock_dir.empty()) std::filesystem::create_directories(lock_dir);
+            lockfd = open(lockfile_path.c_str(), O_CREAT | O_RDWR, 0666);
+            if (lockfd < 0) std::cerr << "Warning: cannot open lockfile " << lockfile_path
+                                      << ", continuing without lock\n";
+        }
 
         GRBEnv env(true);
         env.set("LogFile", "dip_ilp.log");
 
         const int max_attempts = 3;
         for (int attempt = 1; attempt <= max_attempts; ++attempt) {
-            flock(lockfd, LOCK_EX);
+            if (lockfd >= 0) flock(lockfd, LOCK_EX);
             try {
                 env.start();
-                flock(lockfd, LOCK_UN);
+                if (lockfd >= 0) flock(lockfd, LOCK_UN);
                 break;
             } catch (GRBException& e) {
-                flock(lockfd, LOCK_UN);
-                if (attempt == max_attempts) { close(lockfd); throw; }
+                if (lockfd >= 0) flock(lockfd, LOCK_UN);
+                if (attempt == max_attempts) { if (lockfd >= 0) close(lockfd); throw; }
                 std::cerr << "WLS checkout failed (attempt " << attempt << "/"
                           << max_attempts << "): " << e.getMessage()
                           << " -- retrying...\n";
                 std::this_thread::sleep_for(std::chrono::seconds(5 * attempt * attempt));
             }
         }
-        close(lockfd);
+        if (lockfd >= 0) close(lockfd);
 
         GRBModel model(env);
         model.set(GRB_StringAttr_ModelName, "Diploid Path Inference");
-        if (threads >= 0) model.set(GRB_IntParam_Threads, threads);
+        model.set(GRB_IntParam_Threads, 1); // serial solve per run
 
         std::vector<GRBVar> x_1_vars, x_2_vars;
         std::vector<std::pair<int,int>> edge_list;

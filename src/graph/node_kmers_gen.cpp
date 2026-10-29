@@ -125,19 +125,11 @@ std::string get_canonical(const std::string& kmer) {
 
 int main(int argc, char* argv[]) {
 
-    // --------------------------------------------------
-    // Parse command line arguments
-    // --------------------------------------------------
-
     std::unordered_map<std::string, std::string> args;
 
     for (int i = 1; i < argc - 1; i += 2) {
         args[argv[i]] = argv[i + 1];
     }
-
-    // --------------------------------------------------
-    // Validate required arguments
-    // --------------------------------------------------
 
     if (
         args.find("--fraction") == args.end() ||
@@ -157,10 +149,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // --------------------------------------------------
-    // Read arguments
-    // --------------------------------------------------
-
     double fraction =
         std::stod(args["--fraction"]);
 
@@ -170,9 +158,6 @@ int main(int argc, char* argv[]) {
     std::string input_file =
         args["--input"];
 
-    // --------------------------------------------------
-    // Open input graph file
-    // --------------------------------------------------
 
     std::ifstream fin(input_file);
 
@@ -185,17 +170,8 @@ int main(int argc, char* argv[]) {
 
         return 1;
     }
-
-    // --------------------------------------------------
-    // FracMinHash threshold
-    // --------------------------------------------------
-
     double threshold =
         fraction * 4294967296.0;
-
-    // --------------------------------------------------
-    // Output handling
-    // --------------------------------------------------
 
     std::ostream* out = &std::cout;
 
@@ -210,11 +186,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // --------------------------------------------------
-    // Main processing loop
-    // --------------------------------------------------
-
-    std::string line;
+   std::string line;
 
     while (std::getline(fin, line)) {
 
@@ -242,34 +214,24 @@ int main(int argc, char* argv[]) {
         }
 
         std::vector<std::string> sampled_kmers;
-
-        // --------------------------------------------------
         // Generate k-mers
-        // --------------------------------------------------
-
         for (size_t i = 0;
              i <= seq.length() - k;
              ++i) {
 
             std::string kmer =
                 seq.substr(i, k);
-
             // skip ambiguous bases
-
             if (
                 kmer.find_first_of("Nn")
                 != std::string::npos
             ) {
                 continue;
             }
-
             // canonical k-mer
-
             std::string canonical =
                 get_canonical(kmer);
-
             // MurmurHash3
-
             uint32_t h =
                 murmur3_32(
                     reinterpret_cast<const uint8_t*>(
@@ -278,9 +240,7 @@ int main(int argc, char* argv[]) {
                     k,
                     0
                 );
-
             // FracMinHash sampling
-
             if (
                 static_cast<double>(h)
                 < threshold
@@ -289,9 +249,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        // --------------------------------------------------
         // Write sampled k-mers
-        // --------------------------------------------------
 
         if (!sampled_kmers.empty()) {
 
