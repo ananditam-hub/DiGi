@@ -1,23 +1,3 @@
-// Faster, OpenMP-parallel version of read_kmer_sampling.cpp.
-//
-// Same sampling scheme (MurmurHash3_32, seed 0, over the canonical k-mer string),
-// so output matches the original for reads made of A/C/G/T, but:
-//   - k-mers are rolled as 2-bit forward/reverse-complement codes (O(1) per base,
-//     no substr/reverse-complement string allocations)
-//   - counts are keyed by uint64_t instead of std::string
-//   - k-mers containing non-ACGT bases (e.g. N) are skipped; lowercase is folded to uppercase
-// Requires k <= 32.
-//
-// Parallelism:
-//   - a reader thread parses FASTQ into batches of reads (double-buffered, overlaps I/O)
-//   - phase 1, parallel over reads: sampled canonical k-mers go into per-thread,
-//     per-shard buckets (shard = hash % NUM_SHARDS)
-//   - phase 2, parallel over shards: each shard's count table is owned by one thread,
-//     so no locks and no k-mer is stored in more than one table
-// Thread count comes from OMP_NUM_THREADS (default: all cores).
-//
-// Build: g++ -O3 -fopenmp -pthread read_kmer_sampling_fast.cpp -o read_kmer_sampling_fast
-
 #include <iostream>
 #include <fstream>
 #include <string>
