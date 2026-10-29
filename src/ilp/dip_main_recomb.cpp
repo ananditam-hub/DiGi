@@ -1,5 +1,3 @@
-#include "dip_main.h"
-
 #include <fstream>
 #include <map>
 #include <unordered_set>
@@ -18,6 +16,19 @@
 #include <unistd.h>
 
 #include "gurobi_c++.h"
+
+// --- Graph Structure ---
+class Graph{
+    public:
+        int n;
+        std::vector<std::vector<int>> adj;
+        std::vector<std::string> label;
+
+        Graph(int n);
+        void loadLabels(const std::string& filename);
+        void addEdge(int u, int v);
+        void print() const;
+};
 
 // --- Graph Structure Methods ---
 Graph::Graph(int n): n(n), adj(n), label(n) {}
