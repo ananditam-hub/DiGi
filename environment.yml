@@ -10,6 +10,7 @@ dependencies:
   - gxx_linux-64      # C++ compiler; sets CXX for make
   - make
   - fastp             # read quality filtering
+  - kmc               # read k-mer counting
   - nextflow          # runs nf-LO for liftover
   - minimap2          # aligner used by nf-LO
   - crossmap          # lifts junction BEDs through the chain files

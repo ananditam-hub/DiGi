@@ -1,0 +1,14 @@
+experiment:
+  name: DiGi_example
+paths:
+  # relative to example/, where run_example.sh runs from
+  base_dir: work
+
+graph:
+  # 54 HGSVC samples (108 MHC haplotypes), one FASTA per haplotype
+  haplotype_fasta_dir: "{base_dir}/panel"
+
+  # 1-bp hotspot every 10 kb of GRCh38 MHC, lifted to each haplotype; hotspots failing in any haplotype removed
+  rh_bed_file: "{base_dir}/liftover"
+
+  graph_file: "{base_dir}/ref_graph/ref_graph.txt"

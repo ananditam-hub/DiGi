@@ -18,7 +18,7 @@ BIN="$ROOT/bin/node_kmers_gen"
 [ -x "$BIN" ] || { echo "missing $BIN, run make in $ROOT first" >&2; exit 1; }
 
 # Graph output path, read from the config
-GRAPH_FILE=$(python3 -c "import sys, yaml; print(yaml.safe_load(open(sys.argv[1]))['graph']['graph_file'])" "$CONFIG")
+GRAPH_FILE=$(python3 -c "import sys, yaml; c = yaml.safe_load(open(sys.argv[1])); print(c['graph']['graph_file'].format(base_dir=c['paths']['base_dir']))" "$CONFIG")
 OUTDIR=$(dirname "$GRAPH_FILE")
 DEBUG="$OUTDIR/debug_$(basename "$GRAPH_FILE")"
 KMERS="$OUTDIR/node_kmers_${fraction}_k${k}.tsv"
